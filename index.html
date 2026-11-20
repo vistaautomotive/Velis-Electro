@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipistrel Velis Electro – aandrijflijn in 3D</title>
+<style>
+  :root{--bg:#eef1f5;--fg:#1f2937;--muted:#6b7280;--accent:#0b5cad;--panel:rgba(255,255,255,.94)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);overflow:hidden}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  header{position:fixed;left:14px;top:10px;pointer-events:none}
+  h1{font-size:1.1rem;margin:0}
+  header p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
+  .panel{position:fixed;background:var(--panel);border:1px solid #d6dbe2;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+  #controls{left:12px;bottom:12px;padding:10px;max-width:min(560px,calc(100vw - 24px));display:flex;flex-wrap:wrap;gap:6px}
+  #controls .grp{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+  #controls .lbl{width:100%;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:2px}
+  button{font:inherit;font-size:.86rem;padding:6px 10px;border-radius:8px;border:1px solid #c7ccd4;background:#fff;color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+  #info{right:12px;top:12px;width:min(340px,calc(100vw - 24px));padding:14px 16px;display:none}
+  #info h2{font-size:1rem;margin:0 0 6px}
+  #info p{margin:0 0 8px;font-size:.88rem;line-height:1.4}
+  #info ul{margin:0 0 6px;padding-left:18px;font-size:.86rem;line-height:1.4}
+  #info .close{position:absolute;right:8px;top:6px;border:0;background:none;font-size:1.2rem;padding:2px 6px}
+  #hint{position:fixed;right:12px;bottom:12px;font-size:.78rem;color:var(--muted);text-align:right;max-width:300px}
+  #hint a{color:var(--muted)}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:1rem}
+  #credits{display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 24px));max-height:80vh;overflow:auto;padding:16px 18px;font-size:.86rem;line-height:1.45}
+  #credits h2{font-size:1rem;margin:0 0 8px}
+  .tip{position:fixed;pointer-events:none;background:#111827;color:#fff;font-size:.8rem;padding:3px 7px;border-radius:6px;display:none;white-space:nowrap}
+  @media (max-width:700px){#info{top:auto;bottom:calc(12px + var(--ctrlh,190px));}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">Model laden… <span id="pct"></span></div>
+<header><h1>Pipistrel Velis Electro – aandrijflijn</h1><p>Sleep om te draaien · scroll/knijp om te zoomen · klik op een onderdeel voor uitleg</p></header>
+
+<div id="controls" class="panel" role="toolbar" aria-label="Weergave">
+  <div class="grp">
+    <button id="b-xray" aria-pressed="false">Romp doorzichtig</button>
+    <button id="b-flow" aria-pressed="false"><span class="dot" style="background:#facc15"></span>Energiestroom</button>
+    <button id="b-cool" aria-pressed="false"><span class="dot" style="background:#38bdf8"></span>Koelvloeistof</button>
+    <button id="b-prop" aria-pressed="false">Propeller draait</button>
+  </div>
+  <div class="lbl">Onderdelen tonen</div>
+  <div class="grp">
+    <button data-grp="accu" aria-pressed="true"><span class="dot" style="background:#2f6db5"></span>Accu's</button>
+    <button data-grp="engine" aria-pressed="true"><span class="dot" style="background:#7c5cc4"></span>Motor + controller</button>
+    <button data-grp="hv" aria-pressed="true"><span class="dot" style="background:#f97316"></span>HV-kabels</button>
+    <button data-grp="kmotor" aria-pressed="true"><span class="dot" style="background:#1e90ff"></span>Koeling motor</button>
+    <button data-grp="kaccu" aria-pressed="true"><span class="dot" style="background:#14b8a6"></span>Koeling accu's</button>
+  </div>
+  <div class="lbl">Camera</div>
+  <div class="grp">
+    <button data-cam="all">Overzicht</button>
+    <button data-cam="nose">Neus</button>
+    <button data-cam="rear">Achter cabine</button>
+    <button id="b-credits">Bronnen &amp; licentie</button>
+  </div>
+</div>
+
+<div id="info" class="panel" aria-live="polite"><button class="close" aria-label="Sluiten">×</button><div id="info-body"></div></div>
+<div id="hint">Plaats en vorm van de aandrijfcomponenten zijn schematisch, niet op ware maat.</div>
+<div class="tip" id="tip"></div>
+
+<div id="credits" class="panel" role="dialog" aria-label="Bronnen en licentie">
+  <button class="close" aria-label="Sluiten" style="position:absolute;right:8px;top:6px;border:0;background:none;font-size:1.2rem">×</button>
+  <h2>Bronnen &amp; licentie</h2>
+  <p><b>3D-model vliegtuig:</b> Pipistrel Alpha/Velis Electro voor FlightGear, door Bea Wolf (D-ECHO), Sven Seipp (D-SVEN) en Carsten Vogel (TeXnicer). Gepubliceerd onder de GNU General Public License versie 2 of later (zie het bestand COPYING). Het FlightGear-model is uitgebracht zonder officiële goedkeuring van Pipistrel.</p>
+  <p><b>Aanpassingen:</b> omgezet naar glTF en uitgebreid met schematische aandrijfcomponenten (accu's, motor, controller, koelcircuits, HV-kabels) voor lesmateriaal luchtvaarttechniek, Vista College. Deze aanpassingen vallen onder dezelfde GPL-licentie.</p>
+  <p><b>Technische gegevens:</b> Pipistrel (productpagina en brochure Velis Electro), EASA TCDS EASA.E.234 (E-811), POH Velis Electro, en artikelen van Kitplanes, AOPA, Sustainable Skies, University of Waterloo en Wikipedia.</p>
+  <p>Pipistrel, Velis en Velis Electro zijn merken van Pipistrel d.o.o.; deze pagina is geen uitgave van Pipistrel.</p>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const PATHS = {"HV_accu_achter":[[-0.5,-0.12,0.2],[-0.5132,-0.1491,0.216],[-0.5261,-0.1764,0.2306],[-0.5388,-0.2019,0.2438],[-0.5511,-0.2256,0.2556],[-0.5632,-0.2474,0.266],[-0.575,-0.2675,0.275],[-0.5865,-0.2858,0.2826],[-0.5978,-0.3022,0.2889],[-0.6087,-0.3169,0.2938],[-0.6194,-0.3297,0.2972],[-0.6299,-0.3408,0.2993],[-0.64,-0.35,0.3],[-0.652,-0.3581,0.3],[-0.6681,-0.3656,0.3001],[-0.6881,-0.3725,0.3003],[-0.7122,-0.3789,0.3006],[-0.7403,-0.3847,0.3009],[-0.7725,-0.39,0.3013],[-0.8087,-0.3947,0.3017],[-0.8489,-0.3989,0.3022],[-0.8931,-0.4025,0.3028],[-0.9414,-0.4056,0.3035],[-0.9937,-0.4081,0.3042],[-1.05,-0.41,0.305],[-1.108,-0.4116,0.3058],[-1.1653,-0.4129,0.3064],[-1.2219,-0.4141,0.3069],[-1.2778,-0.415,0.3072],[-1.333,-0.4157,0.3074],[-1.3875,-0.4163,0.3075],[-1.4413,-0.4166,0.3074],[-1.4944,-0.4167,0.3072],[-1.5469,-0.4166,0.3069],[-1.5986,-0.4162,0.3064],[-1.6497,-0.4157,0.3058],[-1.7,-0.415,0.305],[-1.749,-0.4135,0.3043],[-1.7958,-0.4106,0.3039],[-1.8406,-0.4062,0.3038],[-1.8833,-0.4006,0.3039],[-1.924,-0.3935,0.3043],[-1.9625,-0.385,0.305],[-1.999,-0.3751,0.306],[-2.0333,-0.3639,0.3072],[-2.0656,-0.3512,0.3088],[-2.0958,-0.3372,0.3106],[-2.124,-0.3218,0.3126],[-2.15,-0.305,0.315],[-2.1742,-0.2875,0.3173],[-2.1969,-0.2701,0.3192],[-2.2181,-0.2528,0.3206],[-2.2378,-0.2356,0.3217],[-2.2559,-0.2184,0.3223],[-2.2725,-0.2013,0.3225],[-2.2876,-0.1842,0.3223],[-2.3011,-0.1672,0.3217],[-2.3131,-0.1503,0.3206],[-2.3236,-0.1335,0.3192],[-2.3326,-0.1167,0.3173],[-2.34,-0.1,0.315],[-2.3467,-0.084,0.3116],[-2.3536,-0.0694,0.3065],[-2.3606,-0.0563,0.2997],[-2.3678,-0.0444,0.2911],[-2.3751,-0.034,0.2808],[-2.3825,-0.025,0.2688],[-2.3901,-0.0174,0.255],[-2.3978,-0.0111,0.2394],[-2.4056,-0.0063,0.2222],[-2.4136,-0.0028,0.2032],[-2.4217,-0.0007,0.1825],[-2.43,0.0,0.16]],"HV_accu_voor":[[-2.3,-0.08,0.2],[-2.3085,-0.0704,0.1995],[-2.3172,-0.0617,0.1981],[-2.3263,-0.0537,0.1956],[-2.3356,-0.0467,0.1922],[-2.3451,-0.0404,0.1878],[-2.355,-0.035,0.1825],[-2.3651,-0.0304,0.1762],[-2.3756,-0.0267,0.1689],[-2.3863,-0.0237,0.1606],[-2.3972,-0.0217,0.1514],[-2.4085,-0.0204,0.1412],[-2.42,-0.02,0.13]],"HV_motorfasen":[[-2.51,0.02,-0.0],[-2.5215,0.0216,-0.0],[-2.5325,0.0231,-0.0],[-2.5431,0.0244,-0.0],[-2.5533,0.0256,-0.0],[-2.5631,0.0266,-0.0],[-2.5725,0.0275,-0.0],[-2.5815,0.0283,-0.0],[-2.59,0.0289,-0.0],[-2.5981,0.0294,-0.0],[-2.6058,0.0297,-0.0],[-2.6131,0.0299,-0.0],[-2.62,0.03,-0.0],[-2.6267,0.0298,-0.0],[-2.6336,0.0292,-0.0],[-2.6406,0.0281,-0.0],[-2.6478,0.0267,-0.0],[-2.6551,0.0248,-0.0],[-2.6625,0.0225,-0.0],[-2.6701,0.0198,-0.0],[-2.6778,0.0167,-0.0],[-2.6856,0.0131,-0.0],[-2.6936,0.0092,-0.0],[-2.7017,0.0048,-0.0],[-2.71,0.0,-0.0]],"Koeling_motor":[[-2.6,-0.27,-0.13],[-2.5871,-0.2553,-0.1332],[-2.575,-0.2414,-0.1361],[-2.5638,-0.2281,-0.1388],[-2.5533,-0.2156,-0.1411],[-2.5438,-0.2037,-0.1432],[-2.535,-0.1925,-0.145],[-2.5271,-0.182,-0.1465],[-2.52,-0.1722,-0.1478],[-2.5138,-0.1631,-0.1488],[-2.5083,-0.1547,-0.1494],[-2.5038,-0.147,-0.1499],[-2.5,-0.14,-0.15],[-2.4968,-0.1334,-0.15],[-2.4938,-0.1268,-0.15],[-2.4909,-0.1203,-0.15],[-2.4883,-0.1139,-0.15],[-2.4859,-0.1075,-0.15],[-2.4837,-0.1013,-0.15],[-2.4818,-0.095,-0.15],[-2.48,-0.0889,-0.15],[-2.4784,-0.0828,-0.15],[-2.4771,-0.0768,-0.15],[-2.4759,-0.0709,-0.15],[-2.475,-0.065,-0.15],[-2.4745,-0.0592,-0.1499],[-2.4746,-0.0533,-0.1496],[-2.4753,-0.0475,-0.1491],[-2.4767,-0.0417,-0.1483],[-2.4786,-0.0358,-0.1474],[-2.4812,-0.03,-0.1463],[-2.4845,-0.0242,-0.1449],[-2.4883,-0.0183,-0.1433],[-2.4928,-0.0125,-0.1416],[-2.4979,-0.0067,-0.1396],[-2.5036,-0.0008,-0.1374],[-2.51,0.005,-0.135],[-2.5168,0.0106,-0.1325],[-2.5237,0.0157,-0.1301],[-2.5309,0.0203,-0.1278],[-2.5383,0.0244,-0.1256],[-2.5459,0.0281,-0.1234],[-2.5537,0.0312,-0.1213],[-2.5618,0.0339,-0.1192],[-2.57,0.0361,-0.1172],[-2.5784,0.0378,-0.1153],[-2.5871,0.039,-0.1135],[-2.5959,0.0398,-0.1117],[-2.605,0.04,-0.11],[-2.614,0.0401,-0.1081],[-2.6226,0.0403,-0.1056],[-2.6309,0.0406,-0.1025],[-2.6389,0.0411,-0.0989],[-2.6465,0.0417,-0.0947],[-2.6537,0.0425,-0.09],[-2.6607,0.0434,-0.0847],[-2.6672,0.0444,-0.0789],[-2.6734,0.0456,-0.0725],[-2.6793,0.0469,-0.0656],[-2.6848,0.0484,-0.0581],[-2.69,0.05,-0.05],[-2.6948,0.0513,-0.0417],[-2.6992,0.0519,-0.0333],[-2.7031,0.0519,-0.025],[-2.7067,0.0511,-0.0167],[-2.7098,0.0497,-0.0083],[-2.7125,0.0475,-0.0],[-2.7148,0.0447,0.0083],[-2.7167,0.0411,0.0167],[-2.7181,0.0369,0.025],[-2.7192,0.0319,0.0333],[-2.7198,0.0263,0.0417],[-2.72,0.02,0.05],[-2.7199,0.0131,0.0581],[-2.7197,0.0058,0.0656],[-2.7194,-0.0019,0.0725],[-2.7189,-0.01,0.0789],[-2.7183,-0.0185,0.0847],[-2.7175,-0.0275,0.09],[-2.7166,-0.0369,0.0947],[-2.7156,-0.0467,0.0989],[-2.7144,-0.0569,0.1025],[-2.7131,-0.0675,0.1056],[-2.7116,-0.0785,0.1081],[-2.71,-0.09,0.11],[-2.7081,-0.1019,0.1117],[-2.7058,-0.1144,0.1133],[-2.7031,-0.1275,0.115],[-2.7,-0.1411,0.1167],[-2.6965,-0.1553,0.1183],[-2.6925,-0.17,0.12],[-2.6881,-0.1853,0.1217],[-2.6833,-0.2011,0.1233],[-2.6781,-0.2175,0.125],[-2.6725,-0.2344,0.1267],[-2.6665,-0.2519,0.1283],[-2.66,-0.27,0.13]],"Koeling_accu":[[-0.06,-0.06,-0.16],[-0.0473,-0.0763,-0.1503],[-0.0358,-0.0917,-0.1411],[-0.0256,-0.1062,-0.1325],[-0.0167,-0.12,-0.1244],[-0.009,-0.1329,-0.1169],[-0.0025,-0.145,-0.11],[0.0027,-0.1563,-0.1036],[0.0067,-0.1667,-0.0978],[0.0094,-0.1762,-0.0925],[0.0108,-0.185,-0.0878],[0.011,-0.1929,-0.0836],[0.01,-0.2,-0.08],[0.0078,-0.2062,-0.0772],[0.0044,-0.2114,-0.0756],[-0.0,-0.2156,-0.075],[-0.0056,-0.2189,-0.0756],[-0.0122,-0.2212,-0.0772],[-0.02,-0.2225,-0.08],[-0.0289,-0.2228,-0.0839],[-0.0389,-0.2222,-0.0889],[-0.05,-0.2206,-0.095],[-0.0622,-0.2181,-0.1022],[-0.0756,-0.2145,-0.1106],[-0.09,-0.21,-0.12],[-0.1047,-0.205,-0.1297],[-0.1186,-0.2,-0.1389],[-0.1319,-0.195,-0.1475],[-0.1444,-0.19,-0.1556],[-0.1563,-0.185,-0.1631],[-0.1675,-0.18,-0.17],[-0.178,-0.175,-0.1764],[-0.1878,-0.17,-0.1822],[-0.1969,-0.165,-0.1875],[-0.2053,-0.16,-0.1922],[-0.213,-0.155,-0.1964],[-0.22,-0.15,-0.2],[-0.2273,-0.1451,-0.2032],[-0.2358,-0.1406,-0.2061],[-0.2456,-0.1363,-0.2087],[-0.2567,-0.1322,-0.2111],[-0.269,-0.1285,-0.2132],[-0.2825,-0.125,-0.215],[-0.2973,-0.1218,-0.2165],[-0.3133,-0.1189,-0.2178],[-0.3306,-0.1163,-0.2188],[-0.3492,-0.1139,-0.2194],[-0.369,-0.1118,-0.2199],[-0.39,-0.11,-0.22],[-0.4111,-0.1092,-0.2203],[-0.4311,-0.11,-0.2214],[-0.45,-0.1125,-0.2231],[-0.4678,-0.1167,-0.2256],[-0.4844,-0.1225,-0.2287],[-0.5,-0.13,-0.2325],[-0.5144,-0.1392,-0.237],[-0.5278,-0.15,-0.2422],[-0.54,-0.1625,-0.2481],[-0.5511,-0.1767,-0.2547],[-0.5611,-0.1925,-0.262],[-0.57,-0.21,-0.27],[-0.5784,-0.2278,-0.2778],[-0.5871,-0.2447,-0.2847],[-0.5959,-0.2606,-0.2906],[-0.605,-0.2756,-0.2956],[-0.6143,-0.2895,-0.2995],[-0.6237,-0.3025,-0.3025],[-0.6334,-0.3145,-0.3045],[-0.6433,-0.3256,-0.3056],[-0.6534,-0.3356,-0.3056],[-0.6638,-0.3447,-0.3047],[-0.6743,-0.3528,-0.3028],[-0.685,-0.36,-0.3],[-0.6976,-0.3665,-0.2968],[-0.7139,-0.3725,-0.294],[-0.7337,-0.3781,-0.2916],[-0.7572,-0.3833,-0.2894],[-0.7843,-0.3881,-0.2877],[-0.815,-0.3925,-0.2862],[-0.8493,-0.3965,-0.2852],[-0.8872,-0.4,-0.2844],[-0.9288,-0.4031,-0.2841],[-0.9739,-0.4058,-0.284],[-1.0226,-0.4081,-0.2843],[-1.075,-0.41,-0.285],[-1.129,-0.4116,-0.2858],[-1.1826,-0.4129,-0.2864],[-1.2359,-0.4141,-0.2869],[-1.2889,-0.415,-0.2872],[-1.3415,-0.4157,-0.2874],[-1.3937,-0.4163,-0.2875],[-1.4457,-0.4166,-0.2874],[-1.4972,-0.4167,-0.2872],[-1.5484,-0.4166,-0.2869],[-1.5993,-0.4162,-0.2864],[-1.6498,-0.4157,-0.2858],[-1.7,-0.415,-0.285],[-1.7483,-0.4139,-0.2841],[-1.7933,-0.4122,-0.2829],[-1.835,-0.41,-0.2816],[-1.8733,-0.4072,-0.28],[-1.9083,-0.4039,-0.2782],[-1.94,-0.4,-0.2763],[-1.9683,-0.3956,-0.2741],[-1.9933,-0.3906,-0.2717],[-2.015,-0.385,-0.2691],[-2.0333,-0.3789,-0.2663],[-2.0483,-0.3722,-0.2632],[-2.06,-0.365,-0.26],[-2.0697,-0.3577,-0.2558],[-2.0786,-0.3507,-0.25],[-2.0869,-0.3441,-0.2425],[-2.0944,-0.3378,-0.2333],[-2.1013,-0.3318,-0.2225],[-2.1075,-0.3263,-0.21],[-2.113,-0.321,-0.1958],[-2.1178,-0.3161,-0.18],[-2.1219,-0.3116,-0.1625],[-2.1253,-0.3074,-0.1433],[-2.128,-0.3035,-0.1225],[-2.13,-0.3,-0.1]],"Koeling_accu_retour":[[-2.13,-0.38,-0.16],[-2.117,-0.3864,-0.1825],[-2.1049,-0.3924,-0.2032],[-2.0934,-0.3978,-0.2222],[-2.0828,-0.4028,-0.2394],[-2.0729,-0.4073,-0.255],[-2.0638,-0.4112,-0.2687],[-2.0554,-0.4148,-0.2808],[-2.0478,-0.4178,-0.2911],[-2.0409,-0.4203,-0.2997],[-2.0349,-0.4224,-0.3065],[-2.0295,-0.4239,-0.3116],[-2.025,-0.425,-0.315],[-2.0189,-0.4258,-0.3174],[-2.009,-0.4267,-0.3197],[-1.9953,-0.4275,-0.3219],[-1.9778,-0.4283,-0.3239],[-1.9564,-0.4292,-0.3258],[-1.9312,-0.43,-0.3275],[-1.9023,-0.4308,-0.3291],[-1.8694,-0.4317,-0.3306],[-1.8328,-0.4325,-0.3319],[-1.7924,-0.4333,-0.3331],[-1.7481,-0.4342,-0.3341],[-1.7,-0.435,-0.335],[-1.6498,-0.4357,-0.3358],[-1.5993,-0.4363,-0.3364],[-1.5484,-0.4366,-0.3369],[-1.4972,-0.4367,-0.3372],[-1.4457,-0.4366,-0.3374],[-1.3937,-0.4363,-0.3375],[-1.3415,-0.4357,-0.3374],[-1.2889,-0.435,-0.3372],[-1.2359,-0.4341,-0.3369],[-1.1826,-0.4329,-0.3364],[-1.129,-0.4316,-0.3358],[-1.075,-0.43,-0.335],[-1.0215,-0.428,-0.3341],[-0.9694,-0.4253,-0.3331],[-0.9187,-0.4219,-0.3319],[-0.8694,-0.4178,-0.3306],[-0.8215,-0.413,-0.3291],[-0.775,-0.4075,-0.3275],[-0.7299,-0.4013,-0.3258],[-0.6861,-0.3944,-0.3239],[-0.6438,-0.3869,-0.3219],[-0.6028,-0.3786,-0.3197],[-0.5632,-0.3697,-0.3174],[-0.525,-0.36,-0.315],[-0.4884,-0.3501,-0.3122],[-0.4538,-0.3406,-0.3088],[-0.4209,-0.3313,-0.3047],[-0.39,-0.3222,-0.3],[-0.3609,-0.3135,-0.2947],[-0.3338,-0.305,-0.2888],[-0.3084,-0.2968,-0.2822],[-0.285,-0.2889,-0.275],[-0.2634,-0.2812,-0.2672],[-0.2437,-0.2739,-0.2588],[-0.2259,-0.2668,-0.2497],[-0.21,-0.26,-0.24],[-0.1953,-0.2532,-0.23],[-0.1814,-0.2461,-0.22],[-0.1681,-0.2387,-0.21],[-0.1556,-0.2311,-0.2],[-0.1437,-0.2232,-0.19],[-0.1325,-0.215,-0.18],[-0.122,-0.2065,-0.17],[-0.1122,-0.1978,-0.16],[-0.1031,-0.1887,-0.15],[-0.0947,-0.1794,-0.14],[-0.087,-0.1699,-0.13],[-0.08,-0.16,-0.12]]};
+
+const INFO = {
+  accu: {t:"Accu's (2×)", h:`<p>Twee vloeistofgekoelde lithiumaccu's, 345 V DC, parallel geschakeld. Eén zit in de neus en één achter de cabine, voor de balans van het toestel.</p>
+   <ul><li>Type: Pipistrel PB345V124E-L, elk 11,0 kWh</li><li>Gewicht: ca. 70 kg per accu</li><li>Bij een storing wordt de defecte accu automatisch afgeschakeld (redundantie)</li><li>Niet wisselbaar, door de vloeistofkoeling en het gewicht</li><li>Opstijgen is niet toegestaan onder 50 % laadtoestand (SoC)</li></ul>`},
+  motor: {t:"Motor E-811 (268 MVLC)", h:`<p>Vloeistofgekoelde axiaalflux-synchroonmotor met permanente magneten. Samen met de controller vormt hij de gecertificeerde E-811-'engine'.</p>
+   <ul><li>Diameter 268 mm, diepte 91 mm, massa 22,7 kg</li><li>Startvermogen 57,6 kW bij 2500 rpm (max. 90 s)</li><li>Continu 49,2 kW bij 2350 rpm</li><li>Ontwikkeld met EMRAX en EMSISO</li></ul>`},
+  ctrl: {t:"Controller H300C", h:`<p>Vermogenselektronica (omvormer): zet de gelijkspanning van de accu's om in de draaistroom die de motor aanstuurt, en regelt zo het vermogen.</p>
+   <ul><li>Onderdeel van de E-811 (motor + controller)</li><li>De koelvloeistof komt eerst in de controller en gaat dan via een slang naar de motor</li><li>Heeft daarnaast een 12 V-voeding nodig</li></ul>`},
+  radm: {t:"Radiator motorcircuit", h:`<p>Koelt de vloeistof van het circuit voor motor en controller. De radiator zit in de neus, daarom heeft de Velis Electro een andere motorkap dan de Virus.</p>`},
+  rada: {t:"Radiator + pompen accucircuit", h:`<p>Het accucircuit is een apart koelcircuit. De radiator en twee elektrische pompen (in serie) zitten achter de achterste accu.</p>
+   <ul><li>De radiator krijgt stuwlucht en heeft twee ventilatoren</li><li>Een luchtschep links helpt bij de accukoeling</li><li>Hetzelfde circuit wordt gebruikt om koude accu's voor te verwarmen tot ca. 20 °C voor het laden</li></ul>`},
+  hv: {t:"HV-kabels (345 V DC)", h:`<p>Hoogspanningskabels van beide accu's naar de controller, en de fasekabels van de controller naar de motor. Oranje is de gangbare kleur voor hoogspanning.</p>`},
+  kmotor: {t:"Koelcircuit motor + controller", h:`<p>Radiator → controller → motor → terug naar de radiator. Eén circuit met een water/glycolmengsel koelt de hele E-811.</p>`},
+  kaccu: {t:"Koelcircuit accu's", h:`<p>Radiator en pompen achter de achterste accu → achterste accu → voorste accu → terug. Houdt de accu's binnen hun temperatuurbereik; bij het laden moet de accu tussen 0 en 45 °C blijven.</p>`},
+  prop: {t:"Propeller P-812-164-F3A", h:`<p>Gecertificeerde composiet propeller met vaste spoed, drie bladen, diameter 1,64 m.</p>`}
+};
+const NODE2KEY = {Accu_voor:'accu',Accu_achter:'accu',Motor_E811:'motor',Motor_stator:'motor',Controller_H300C:'ctrl',
+  Radiator_motor:'radm',Radiator_accu:'rada',Pomp_1:'rada',Pomp_2:'rada',HV_accu_achter:'hv',HV_accu_voor:'hv',HV_motorfasen:'hv',
+  Koeling_motor:'kmotor',Koeling_accu:'kaccu',Koeling_accu_retour:'kaccu',Propeller:'prop'};
+const GROUPS = {accu:['Accu_voor','Accu_achter'], engine:['Motor_E811','Motor_stator','Controller_H300C'],
+  hv:['HV_accu_achter','HV_accu_voor','HV_motorfasen'], kmotor:['Koeling_motor','Radiator_motor'],
+  kaccu:['Koeling_accu','Koeling_accu_retour','Radiator_accu','Pomp_1','Pomp_2']};
+
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0;
+app.appendChild(renderer.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xeef1f5);
+const pmrem=new THREE.PMREMGenerator(renderer); scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.05,200);
+const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.minDistance=0.6; controls.maxDistance=25;
+const sun=new THREE.DirectionalLight(0xffffff,1.2); sun.position.set(-3,6,4); scene.add(sun);
+// ground
+const ground=new THREE.Mesh(new THREE.CircleGeometry(9,64),new THREE.MeshStandardMaterial({color:0xdfe4ea,roughness:1}));
+ground.rotation.x=-Math.PI/2; scene.add(ground);
+
+const named={}; const skinMats=new Set(); const compMeshes=[]; let prop=null;
+const loader=new GLTFLoader();
+loader.load('velis.glb',(g)=>{
+  const root=g.scene; scene.add(root);
+  root.traverse(o=>{ if(o.name) named[o.name]=o; });
+  const compNames=new Set(Object.keys(NODE2KEY));
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    // find owning named node
+    let n=o, owner=null; while(n){ if(compNames.has(n.name)){owner=n.name;break;} n=n.parent; }
+    if(owner && owner!=='Propeller'){
+      o.material=o.material.clone(); o.material.emissive=new THREE.Color(0x000000); o.userData.key=NODE2KEY[owner]; o.userData.owner=owner;
+      compMeshes.push(o);
+    } else {
+      if(owner==='Propeller'){ o.userData.key='prop'; compMeshes.push(o); }
+      const ms=Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(m=>{ skinMats.add(m); m.userData.op=m.opacity; m.userData.tr=m.transparent; });
+    }
+  });
+  prop=named['Propeller'];
+  // ground at wheel bottom
+  const box=new THREE.Box3().setFromObject(root); ground.position.y=box.min.y-0.002;
+  setCam('all',false);
+  buildFlows();
+  setXray(false);
+  document.getElementById('loading').remove();
+},(e)=>{ if(e.total) document.getElementById('pct').textContent=Math.round(e.loaded/e.total*100)+'%'; },
+()=>{ document.getElementById('loading').textContent='Het model kon niet worden geladen.'; });
+
+// --- x-ray
+let xray=false;
+function setXray(on){
+  xray=on;
+  skinMats.forEach(m=>{
+    if(on){ m.transparent=true; m.opacity=Math.min(m.userData.op,1)*0.13; m.depthWrite=false; }
+    else { m.transparent=m.userData.tr; m.opacity=m.userData.op; m.depthWrite=true; }
+    m.needsUpdate=true;
+  });
+  compMeshes.forEach(c=>{ if(c.userData.key!=='prop') c.renderOrder=on?2:0; });
+}
+// --- flows (particles along paths)
+const flows=[]; // {curve, mesh, n, speed, kind}
+function buildFlows(){
+  const mk=(name,color,n,size,kind,speed)=>{
+    const pts=PATHS[name].map(p=>new THREE.Vector3(p[0],p[1],p[2]));
+    const curve=new THREE.CatmullRomCurve3(pts); const len=curve.getLength();
+    const geo=new THREE.SphereGeometry(size,10,8);
+    const mat=new THREE.MeshBasicMaterial({color, depthTest:false, transparent:true, opacity:.95});
+    const mesh=new THREE.InstancedMesh(geo,mat,n); mesh.renderOrder=5; mesh.visible=false; scene.add(mesh);
+    flows.push({curve,mesh,n,len,kind,speed,name});
+  };
+  mk('HV_accu_achter',0xfacc15,Math.round(PATHS.HV_accu_achter.length/2.5),0.016,'flow',0.55);
+  mk('HV_accu_voor',0xfacc15,4,0.016,'flow',0.55);
+  mk('HV_motorfasen',0xfde047,6,0.016,'flow',0.55);
+  mk('Koeling_motor',0x38bdf8,16,0.013,'cool',0.35);
+  mk('Koeling_accu',0x5eead4,26,0.013,'cool',0.35);
+  mk('Koeling_accu_retour',0x5eead4,22,0.013,'cool',0.35);
+}
+const tmpM=new THREE.Matrix4();
+function updateFlows(t){
+  for(const f of flows){
+    const grpOK = f.kind==='flow' ? groupOn.hv : (f.name==='Koeling_motor'?groupOn.kmotor:groupOn.kaccu);
+    f.mesh.visible = (f.kind==='flow'?flowOn:coolOn) && grpOK;
+    if(!f.mesh.visible) continue;
+    for(let i=0;i<f.n;i++){
+      const u=((t*f.speed/f.len)+i/f.n)%1; const p=f.curve.getPointAt(u);
+      tmpM.makeTranslation(p.x,p.y,p.z); f.mesh.setMatrixAt(i,tmpM);
+    }
+    f.mesh.instanceMatrix.needsUpdate=true;
+  }
+}
+// --- state + UI
+let flowOn=false, coolOn=false, propOn=false;
+const groupOn={accu:true,engine:true,hv:true,kmotor:true,kaccu:true};
+function press(btn,on){ btn.setAttribute('aria-pressed',String(on)); }
+const bx=document.getElementById('b-xray'), bf=document.getElementById('b-flow'), bc=document.getElementById('b-cool'), bp=document.getElementById('b-prop');
+bx.onclick=()=>{ setXray(!xray); press(bx,xray); };
+bf.onclick=()=>{ flowOn=!flowOn; press(bf,flowOn); if(flowOn){ if(!xray){setXray(true);press(bx,true);} propOn=true; press(bp,true);} };
+bc.onclick=()=>{ coolOn=!coolOn; press(bc,coolOn); if(coolOn&&!xray){setXray(true);press(bx,true);} };
+bp.onclick=()=>{ propOn=!propOn; press(bp,propOn); };
+document.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{
+  const g=b.dataset.grp; groupOn[g]=!groupOn[g]; press(b,groupOn[g]);
+  GROUPS[g].forEach(n=>{ if(named[n]) named[n].visible=groupOn[g]; });
+  if(groupOn[g] && !xray){ setXray(true); press(bx,true); }
+});
+// camera presets (glTF coords: x aft, y up, z = -right)
+const CAMS={ all:{p:[-6.5,2.6,-6.5],t:[-0.6,-0.1,0]}, nose:{p:[-3.9,0.45,-1.3],t:[-2.5,-0.15,0]}, rear:{p:[0.9,0.7,-1.6],t:[-0.4,-0.05,0]} };
+let camAnim=null;
+function setCam(k,anim=true){
+  const c=CAMS[k]; const p=new THREE.Vector3(...c.p), t=new THREE.Vector3(...c.t);
+  if(!anim){ camera.position.copy(p); controls.target.copy(t); controls.update(); return; }
+  camAnim={p0:camera.position.clone(),t0:controls.target.clone(),p,t,s:performance.now()};
+  if(k!=='all' && !xray){ setXray(true); press(bx,true); }
+}
+document.querySelectorAll('[data-cam]').forEach(b=>b.onclick=()=>setCam(b.dataset.cam));
+// credits
+const cr=document.getElementById('credits');
+document.getElementById('b-credits').onclick=()=>{ cr.style.display='block'; };
+cr.querySelector('.close').onclick=()=>{ cr.style.display='none'; };
+// info + picking
+const info=document.getElementById('info'), ib=document.getElementById('info-body');
+info.querySelector('.close').onclick=()=>{ info.style.display='none'; highlight(null); };
+let hl=null;
+function highlight(key){
+  hl=key; compMeshes.forEach(m=>{ if(m.material.emissive) m.material.emissive.setHex(m.userData.key===key?0x6b5200:0x000000); });
+}
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(); const tip=document.getElementById('tip');
+function pick(ev){
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.set(((ev.clientX-r.left)/r.width)*2-1, -((ev.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse,camera);
+  const targets=compMeshes.filter(m=>{ let n=m; while(n){ if(!n.visible) return false; n=n.parent; } return xray || m.userData.key==='prop'; });
+  const hit=ray.intersectObjects(targets,false)[0]; return hit?hit.object.userData.key:null;
+}
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5) return;
+  const k=pick(e);
+  if(k){ ib.innerHTML='<h2>'+INFO[k].t+'</h2>'+INFO[k].h; info.style.display='block'; highlight(k); }
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='mouse') return;
+  const k=pick(e);
+  if(k){ tip.textContent=INFO[k].t; tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+10)+'px'; tip.style.display='block'; renderer.domElement.style.cursor='pointer'; }
+  else { tip.style.display='none'; renderer.domElement.style.cursor=''; }
+});
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+const ctrlEl=document.getElementById('controls');
+new ResizeObserver(()=>document.documentElement.style.setProperty('--ctrlh',(ctrlEl.offsetHeight+12)+'px')).observe(ctrlEl);
+// loop
+const clock=new THREE.Clock(); let t=0, w=0;
+renderer.setAnimationLoop(()=>{
+  const dt=Math.min(clock.getDelta(),0.05); t+=dt;
+  if(camAnim){ const k=Math.min((performance.now()-camAnim.s)/900,1), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    camera.position.lerpVectors(camAnim.p0,camAnim.p,e); controls.target.lerpVectors(camAnim.t0,camAnim.t,e); if(k>=1) camAnim=null; }
+  const target=propOn?40:0; w+= (target-w)*Math.min(dt*1.5,1);
+  if(prop) prop.rotation.x -= w*dt;
+  updateFlows(t);
+  controls.update(); renderer.render(scene,camera);
+});
+</script>
+</body>
+</html>
