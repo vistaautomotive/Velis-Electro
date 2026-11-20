@@ -6,6 +6,9 @@ met animaties van de energiestroom en de koelvloeistof.
 
 Plaats en vorm van de aandrijfcomponenten zijn schematisch en niet op ware maat.
 
+- `index.html` – interactieve 3D-versie (ook geschikt voor Electude en telefoon)
+- `ar.html` – AR-versie (iPhone/iPad, Android, Apple Vision Pro), met de buitenkant of de aandrijflijn zichtbaar
+
 ## Herkomst en licentie
 
 - **3D-model vliegtuig:** *Pipistrel Alpha/Velis Electro* voor FlightGear, door Bea Wolf (D-ECHO),
