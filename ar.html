@@ -13,13 +13,15 @@
   header{padding:8px 12px 2px}
   h1{font-size:1rem;margin:0}
   header p{margin:2px 0 0;color:var(--muted);font-size:.8rem}
-  model-viewer{flex:1;width:100%;min-height:240px;background:linear-gradient(#eef1f5,#d9dee5)}
-  .bar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 10px;align-items:center}
-  button,a.btn{font:inherit;font-size:.85rem;padding:7px 12px;border-radius:8px;border:1px solid #c7ccd4;background:#fff;color:var(--fg);cursor:pointer;text-decoration:none}
+  model-viewer{flex:1;width:100%;min-height:220px;background:linear-gradient(#eef1f5,#d9dee5)}
+  .bar{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 4px;scrollbar-width:none}
+  .bar::-webkit-scrollbar{display:none}
+  button,a.btn{font:inherit;font-size:.84rem;padding:7px 11px;border-radius:8px;border:1px solid #c7ccd4;background:#fff;color:var(--fg);cursor:pointer;text-decoration:none;white-space:nowrap;flex:none}
   button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
   button:focus-visible,a.btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
   #ar{position:absolute;right:12px;bottom:12px;background:var(--accent);color:#fff;border-color:var(--accent);font-size:.95rem;padding:9px 16px}
-  .note{color:var(--muted);font-size:.78rem;padding:0 12px 10px}
+  #desc{padding:2px 12px 4px;font-size:.84rem;line-height:1.4;min-height:2.6em}
+  .note{color:var(--muted);font-size:.74rem;padding:0 12px 10px}
   .progress{position:absolute;left:0;right:0;top:0;height:4px}
   .progress>div{height:100%;width:0;background:var(--accent);transition:width .2s}
 </style>
@@ -28,7 +30,7 @@
 <div class="wrap">
   <header>
     <h1>Pipistrel Velis Electro – AR</h1>
-    <p>Kies een weergave en tik op <b>Bekijk in AR</b> om het toestel in de ruimte te zetten.</p>
+    <p>Kies wat je wilt bekijken en tik op <b>Bekijk in AR</b>.</p>
   </header>
 
   <model-viewer id="mv"
@@ -36,30 +38,44 @@
     alt="3D-model van de Pipistrel Velis Electro"
     camera-controls touch-action="pan-y" autoplay
     shadow-intensity="0.8" exposure="1.0" environment-image="neutral"
-    camera-orbit="215deg 72deg 14m" min-camera-orbit="auto auto 3m" max-camera-orbit="auto auto 30m"
+    camera-orbit="-35deg 72deg 14m"
     ar ar-modes="quick-look webxr scene-viewer" ar-scale="auto" ar-placement="floor">
     <div class="progress" slot="progress-bar"><div id="pb"></div></div>
     <button slot="ar-button" id="ar">Bekijk in AR</button>
   </model-viewer>
 
-  <div class="bar" role="toolbar" aria-label="Weergave">
-    <button id="v-ext" aria-pressed="true">Buitenkant</button>
-    <button id="v-xray" aria-pressed="false">Aandrijflijn zichtbaar</button>
-    <a class="btn" href="./">← Interactieve 3D-versie</a>
+  <div class="bar" role="toolbar" aria-label="Kies een model">
+    <button data-v="ext" aria-pressed="true">Buitenkant</button>
+    <button data-v="xray" aria-pressed="false">Aandrijflijn</button>
+    <button data-v="expl" aria-pressed="false">Uit elkaar</button>
+    <button data-v="motor" aria-pressed="false">Motor E-811</button>
+    <button data-v="accu" aria-pressed="false">Accu</button>
   </div>
-  <div class="note">AR werkt op een iPhone/iPad (Quick Look), een Android-telefoon met ARCore en de Apple Vision Pro. Het toestel verschijnt op ware grootte (spanwijdte 10,7 m); knijp om het kleiner te maken. De aandrijfcomponenten zijn schematisch. Model: FlightGear Velis Electro (Bea Wolf, Sven Seipp, Carsten Vogel), GPLv2+.</div>
+  <div id="desc" aria-live="polite"></div>
+  <div class="note">Werkt op iPhone/iPad (Quick Look), Android met ARCore en Apple Vision Pro. Modellen op ware grootte; knijp om te schalen. Aandrijfcomponenten en interne opbouw zijn schematisch. Vliegtuigmodel: FlightGear Velis Electro (Bea Wolf, Sven Seipp, Carsten Vogel), GPLv2+. <a href="./">← Interactieve 3D-versie</a></div>
 </div>
 <script>
-  const mv=document.getElementById('mv'), pb=document.getElementById('pb');
-  const ext=document.getElementById('v-ext'), xr=document.getElementById('v-xray');
+  const V={
+    ext:{src:'velis_ar',orbit:'-35deg 72deg 14m',min:'3m',max:'30m',d:'Het complete toestel op ware grootte (spanwijdte 10,7 m). De propeller draait.'},
+    xray:{src:'velis_ar_xray',orbit:'-35deg 72deg 12m',min:'2m',max:'30m',d:'Doorzichtige romp: twee accu\'s (neus en achter de cabine), motor + controller, koelcircuits en HV-kabels.'},
+    expl:{src:'velis_exploded',orbit:'-20deg 75deg 13m',min:'2m',max:'30m',d:'De onderdelen schuiven uit het toestel, met labels erbij, en daarna weer terug. Labels zijn het best leesbaar vanaf de linkerkant.'},
+    motor:{src:'motor_e811',orbit:'-15deg 78deg 1.3m',min:'0.3m',max:'4m',d:'Axiaalfluxmotor op ware grootte (Ø 268 mm): twee rotorschijven met magneten draaien langs de vaste stator met koperspoelen. Hij gaat uit elkaar en weer in elkaar.'},
+    accu:{src:'accu',orbit:'-15deg 72deg 2.4m',min:'0.4m',max:'6m',d:'Eén accu (11 kWh, 345 V): deksel, celmodules met busbars, BMS en koelplaat. De interne opbouw is schematisch.'}
+  };
+  const mv=document.getElementById('mv'), pb=document.getElementById('pb'), desc=document.getElementById('desc');
   mv.addEventListener('progress',e=>{ pb.style.width=(e.detail.totalProgress*100)+'%'; pb.parentElement.style.opacity=e.detail.totalProgress>=1?0:1; });
   mv.addEventListener('load',()=>{ const a=mv.availableAnimations||[]; if(a.length){ mv.animationName=a[0]; mv.play(); } });
-  function setView(x){
-    mv.src = x ? 'velis_ar_xray.glb' : 'velis_ar.glb';
-    mv.setAttribute('ios-src', x ? 'velis_ar_xray.usdz' : 'velis_ar.usdz');
-    ext.setAttribute('aria-pressed',String(!x)); xr.setAttribute('aria-pressed',String(x));
+  function setView(k){
+    const v=V[k];
+    mv.src=v.src+'.glb'; mv.setAttribute('ios-src',v.src+'.usdz');
+    mv.cameraOrbit=v.orbit; mv.minCameraOrbit='auto auto '+v.min; mv.maxCameraOrbit='auto auto '+v.max;
+    mv.cameraTarget='auto auto auto'; mv.jumpCameraToGoal && mv.jumpCameraToGoal();
+    document.querySelectorAll('[data-v]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===k)));
+    desc.textContent=v.d;
+    try{ history.replaceState(null,'','#'+k); }catch(e){}
   }
-  ext.onclick=()=>setView(false); xr.onclick=()=>setView(true);
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>setView(b.dataset.v));
+  const start=(location.hash||'').slice(1); setView(V[start]?start:'ext');
 </script>
 </body>
 </html>

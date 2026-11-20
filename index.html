@@ -7,6 +7,7 @@
 <style>
   :root{--bg:#eef1f5;--fg:#1f2937;--muted:#6b7280;--accent:#0b5cad;--panel:rgba(255,255,255,.95)}
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:var(--bg);overflow:hidden}
   #app{position:fixed;inset:0}
   canvas{display:block;touch-action:none}
@@ -46,6 +47,19 @@
   .compact #info h2{font-size:.9rem}
   .compact.wide #info{left:auto;right:8px;top:32px;bottom:auto;width:min(290px,40vw);max-height:calc(100vh - var(--ctrlh,60px) - 44px)}
   .compact.wide #controls{max-width:calc(100% - 16px)}
+
+  #xr-ui{display:none;position:fixed;inset:0;pointer-events:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #xr-ui.on{display:block}
+  #xr-ui .xr-top{position:absolute;left:8px;right:8px;top:8px;pointer-events:auto}
+  #xr-ui .xr-msg{background:rgba(17,24,39,.82);color:#fff;border-radius:10px;padding:8px 12px;font-size:.88rem;text-align:center}
+  #xr-info{display:none;background:rgba(255,255,255,.95);border-radius:10px;padding:10px 12px;margin-top:6px;max-height:34vh;overflow:auto;position:relative}
+  #xr-info h2{font-size:.95rem;margin:0 26px 4px 0} #xr-info p,#xr-info ul{font-size:.82rem;margin:0 0 6px;line-height:1.35} #xr-info ul{padding-left:18px}
+  #xr-ui .xr-bot{position:absolute;left:8px;right:8px;bottom:12px;display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+  #xr-ui .xr-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+  #xr-ui .xr-row::-webkit-scrollbar{display:none}
+  #xr-ui button{font-size:.84rem;padding:8px 11px;background:rgba(255,255,255,.95)}
+  #xr-ui button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  #xr-ui .xr-scale{background:rgba(17,24,39,.82);color:#fff;border-radius:8px;padding:8px 10px;font-size:.84rem;white-space:nowrap}
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
@@ -63,6 +77,7 @@
     <button id="b-flow" aria-pressed="false"><span class="dot" style="background:#facc15"></span>Energie</button>
     <button id="b-cool" aria-pressed="false"><span class="dot" style="background:#38bdf8"></span>Koeling</button>
     <button id="b-prop" aria-pressed="false">Propeller</button>
+    <button id="b-xr" hidden>AR starten</button>
     <button id="b-more" aria-expanded="false">Meer ▴</button>
   </div>
   <div id="more">
@@ -88,6 +103,31 @@
 <div id="info" class="panel" aria-live="polite"><button class="close" aria-label="Sluiten">×</button><div id="info-body"></div></div>
 <div id="hint">Plaats en vorm van de aandrijfcomponenten zijn schematisch, niet op ware maat.</div>
 <div class="tip" id="tip"></div>
+<div id="xr-ui">
+  <div class="xr-top"><div class="xr-msg" id="xr-msg">Beweeg je telefoon rustig over de vloer of tafel…</div>
+    <div id="xr-info"><button class="close" id="xr-info-close" aria-label="Sluiten">×</button><div id="xr-info-body"></div></div></div>
+  <div class="xr-bot">
+    <div class="xr-row" id="xr-row-model">
+      <button data-xm="air" aria-pressed="true">Vliegtuig</button>
+      <button data-xm="motor" aria-pressed="false">Motor E-811</button>
+      <button data-xm="accu" aria-pressed="false">Accu</button>
+    </div>
+    <div class="xr-row" id="xr-row-air">
+      <button id="xr-xray" aria-pressed="false">Doorzichtig</button>
+      <button id="xr-flow" aria-pressed="false">Energie</button>
+      <button id="xr-cool" aria-pressed="false">Koeling</button>
+    </div>
+    <div class="xr-row" id="xr-row-part" hidden>
+      <button id="xr-explode" aria-pressed="false">Uit elkaar</button>
+    </div>
+    <div class="xr-row">
+      <button id="xr-smaller" aria-label="Kleiner">−</button><span class="xr-scale" id="xr-scale">1:5</span><button id="xr-bigger" aria-label="Groter">+</button>
+      <button id="xr-replace">Opnieuw plaatsen</button>
+      <button id="xr-exit">Stop AR</button>
+    </div>
+  </div>
+</div>
+
 
 <div id="credits" class="panel" role="dialog" aria-label="Bronnen en licentie">
   <button class="close" aria-label="Sluiten">×</button>
@@ -143,9 +183,10 @@ const ground=new THREE.Mesh(new THREE.CircleGeometry(9,64),new THREE.MeshStandar
 ground.rotation.x=-Math.PI/2; scene.add(ground);
 
 const named={}; const skinMats=new Set(); const compMeshes=[]; let prop=null;
+const airGroup=new THREE.Group(); scene.add(airGroup);
 const loader=new GLTFLoader();
 loader.load('velis.glb',(g)=>{
-  const root=g.scene; scene.add(root);
+  const root=g.scene; airGroup.add(root);
   root.traverse(o=>{ if(o.name) named[o.name]=o; });
   const compNames=new Set(Object.keys(NODE2KEY));
   root.traverse(o=>{
@@ -190,7 +231,7 @@ function buildFlows(){
     const curve=new THREE.CatmullRomCurve3(pts); const len=curve.getLength();
     const geo=new THREE.SphereGeometry(size,10,8);
     const mat=new THREE.MeshBasicMaterial({color, depthTest:false, transparent:true, opacity:.95});
-    const mesh=new THREE.InstancedMesh(geo,mat,n); mesh.renderOrder=5; mesh.visible=false; scene.add(mesh);
+    const mesh=new THREE.InstancedMesh(geo,mat,n); mesh.renderOrder=5; mesh.visible=false; airGroup.add(mesh);
     flows.push({curve,mesh,n,len,kind,speed,name});
   };
   mk('HV_accu_achter',0xfacc15,Math.round(PATHS.HV_accu_achter.length/2.5),0.016,'flow',0.55);
@@ -283,16 +324,148 @@ bm.onclick=()=>{ const o=!ctrl.classList.contains('open'); ctrl.classList.toggle
 if(innerWidth>=1000 && innerHeight>=700){ bm.click(); }
 addEventListener('resize',layout); new ResizeObserver(layout).observe(ctrl); layout();
 
+
+// ================= WebXR AR (Android Chrome) =================
+const PART_INFO={
+ motor:{Rotor_voor:'rotor',Rotor_achter:'rotor',Statorkern:'stator',Spoelen:'stator',Statorhuis:'huis',Koelribben:'huis',Koelaansluitingen:'mkoel',Fasekabels:'fase',As_flens:'as',Voet:null},
+ accu:{Deksel:'deksel',Celmodules:'modules',Busbars:'busbars',BMS:'bms',Koelplaat:'koelplaat',HV_aansluiting:'hvacc',Koelaansluitingen:'akoel',Behuizing:'bak'}
+};
+Object.assign(INFO,{
+ rotor:{t:'Rotorschijf',h:'<p>Stalen schijf met afwisselend N- en Z-magneten (permanente magneten). Beide rotors zitten op de as en draaien mee. Het magnetisch veld loopt evenwijdig aan de as door de stator: daarom heet dit een axiaalfluxmotor.</p>'},
+ stator:{t:'Stator met koperspoelen',h:'<p>Staat vast. De controller stuurt driefasige wisselstroom door de spoelen; zo ontstaat een draaiend magnetisch veld dat de rotormagneten meeneemt.</p>'},
+ huis:{t:'Statorhuis',h:'<p>Draagt de stator en voert de warmte af. De E-811 is vloeistofgekoeld.</p>'},
+ mkoel:{t:'Koelvloeistof in/uit (motor)',h:'<p>Aansluiting op het koelcircuit van motor en controller (water/glycol).</p>'},
+ fase:{t:'Fasekabels U·V·W',h:'<p>De drie fasen vanaf de controller H300C.</p>'},
+ as:{t:'As + propellerflens',h:'<p>Hierop zit de propeller P-812-164-F3A: vaste spoed, drie bladen, Ø 1,64 m.</p>'},
+ deksel:{t:'Deksel',h:'<p>Sluit de accubak af en beschermt de cellen. (Opbouw schematisch.)</p>'},
+ modules:{t:'Celmodules',h:'<p>Groepen lithium-ioncellen. In serie geschakeld komen ze op de nominale spanning van ca. 345 V. Eén accu heeft 11 kWh. (Opbouw schematisch.)</p>'},
+ busbars:{t:'Busbars',h:'<p>Koperen strips die de modules verbinden en de hoge stroom voeren.</p>'},
+ bms:{t:'Battery Management System (BMS)',h:'<p>Bewaakt spanning en temperatuur van de cellen en grijpt in bij afwijkingen. Bij een storing wordt een accu afgeschakeld.</p>'},
+ koelplaat:{t:'Koelplaat',h:'<p>Koelvloeistof stroomt door kanalen onder de modules. Met hetzelfde circuit worden koude accu\'s voor het laden voorverwarmd tot ca. 20 °C.</p>'},
+ hvacc:{t:'HV-aansluiting',h:'<p>345 V DC naar de controller.</p>'},
+ akoel:{t:'Koelvloeistof in/uit (accu)',h:'<p>Naar het accukoelcircuit met radiator en twee pompen achter de achterste accu.</p>'},
+ bak:{t:'Accubak',h:'<p>Draagt de celmodules en de koelplaat.</p>'}
+});
+const bXR=document.getElementById('b-xr'), xrUI=document.getElementById('xr-ui'), xrMsg=document.getElementById('xr-msg');
+const xrInfo=document.getElementById('xr-info'), xrInfoBody=document.getElementById('xr-info-body');
+let xrSession=null, hitSource=null, placed=false, xrModel='air';
+const anchor=new THREE.Group(); scene.add(anchor);
+const reticle=new THREE.Mesh(new THREE.RingGeometry(0.07,0.09,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffffff}));
+reticle.matrixAutoUpdate=false; reticle.visible=false; scene.add(reticle);
+const parts={}; // motor/accu: {group, mixer, action, targets, explode, tcur, ttarget}
+const SCALES={air:[1,1/2,1/5,1/10,1/20],motor:[2,1,1/2],accu:[2,1,1/2]};
+const scaleIdx={air:2,motor:1,accu:1};
+function scaleLabel(s){ return s>=1?(s+':1'):('1:'+Math.round(1/s)); }
+// pivot: put model bottom on floor and center it
+function pivotOf(obj){
+  const box=new THREE.Box3().setFromObject(obj); const c=box.getCenter(new THREE.Vector3());
+  return new THREE.Vector3(-c.x,-box.min.y,-c.z);
+}
+let airPivot=null;
+function loadPart(k){
+  return new Promise((res,rej)=>{
+    if(parts[k]) return res(parts[k]);
+    new GLTFLoader().load(k==='motor'?'motor_e811.glb':'accu.glb',g=>{
+      const grp=new THREE.Group(); grp.add(g.scene);
+      const mixer=new THREE.AnimationMixer(g.scene); const action=g.animations[0]?mixer.clipAction(g.animations[0]):null;
+      if(action){ action.play(); action.paused=true; action.time=0; mixer.update(0); }
+      const p=pivotOf(g.scene); g.scene.position.copy(p);
+      const targets=[]; g.scene.traverse(o=>{ if(o.isMesh){ let n=o; while(n){ if(PART_INFO[k][n.name]){ o.userData.key=PART_INFO[k][n.name]; targets.push(o); break;} n=n.parent; } } });
+      parts[k]={group:grp,mixer,action,targets,tcur:0,ttarget:0}; res(parts[k]);
+    },undefined,rej);
+  });
+}
+function showXRInfo(k){ if(!k||!INFO[k]) return; xrInfoBody.innerHTML='<h2>'+INFO[k].t+'</h2>'+INFO[k].h; xrInfo.style.display='block'; highlight(k); }
+document.getElementById('xr-info-close').onclick=()=>{ xrInfo.style.display='none'; highlight(null); };
+function setXRModel(k){
+  xrModel=k; anchor.clear();
+  document.querySelectorAll('[data-xm]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.xm===k)));
+  document.getElementById('xr-row-air').hidden=(k!=='air'); document.getElementById('xr-row-part').hidden=(k==='air');
+  xrInfo.style.display='none';
+  if(k==='air'){ anchor.add(airGroup); airGroup.position.copy(airPivot); }
+  else { xrMsg.textContent='Model laden…'; loadPart(k).then(p=>{ if(xrModel!==k) return; anchor.add(p.group);
+           document.getElementById('xr-explode').setAttribute('aria-pressed',String(p.ttarget>0)); xrMsg.textContent='Tik op een onderdeel voor uitleg.'; }); }
+  applyScale();
+}
+function applyScale(){ const s=SCALES[xrModel][scaleIdx[xrModel]]; anchor.scale.setScalar(s); document.getElementById('xr-scale').textContent=scaleLabel(s); }
+document.querySelectorAll('[data-xm]').forEach(b=>b.onclick=()=>setXRModel(b.dataset.xm));
+document.getElementById('xr-smaller').onclick=()=>{ scaleIdx[xrModel]=Math.min(SCALES[xrModel].length-1,scaleIdx[xrModel]+1); applyScale(); };
+document.getElementById('xr-bigger').onclick=()=>{ scaleIdx[xrModel]=Math.max(0,scaleIdx[xrModel]-1); applyScale(); };
+document.getElementById('xr-replace').onclick=()=>{ placed=false; anchor.visible=false; xrMsg.textContent='Richt op de vloer of tafel en tik om te plaatsen.'; };
+document.getElementById('xr-exit').onclick=()=>{ if(xrSession) xrSession.end(); };
+const xx=document.getElementById('xr-xray'), xf=document.getElementById('xr-flow'), xc=document.getElementById('xr-cool');
+xx.onclick=()=>{ setXray(!xray); press(xx,xray); press(bx,xray); };
+xf.onclick=()=>{ flowOn=!flowOn; press(xf,flowOn); press(bf,flowOn); if(flowOn){ if(!xray){setXray(true);press(xx,true);press(bx,true);} propOn=true; press(bp,true);} };
+xc.onclick=()=>{ coolOn=!coolOn; press(xc,coolOn); press(bc,coolOn); if(coolOn&&!xray){setXray(true);press(xx,true);press(bx,true);} };
+document.getElementById('xr-explode').onclick=(e)=>{ const p=parts[xrModel]; if(!p) return; p.ttarget=p.ttarget>0?0:5.0; press(e.currentTarget,p.ttarget>0); };
+// don't let taps on the overlay count as XR "select"
+xrUI.addEventListener('beforexrselect',e=>e.preventDefault());
+const ctrl0=renderer.xr.getController(0); scene.add(ctrl0);
+const tmpRot=new THREE.Matrix4();
+ctrl0.addEventListener('select',()=>{
+  if(!placed){
+    if(!reticle.visible) return;
+    anchor.position.setFromMatrixPosition(reticle.matrix);
+    const cam=renderer.xr.getCamera(); const cp=new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+    anchor.rotation.set(0,Math.atan2(cp.x-anchor.position.x,cp.z-anchor.position.z),0);
+    anchor.visible=true; placed=true; reticle.visible=false;
+    xrMsg.textContent='Tik op een onderdeel voor uitleg.'; return;
+  }
+  tmpRot.identity().extractRotation(ctrl0.matrixWorld);
+  ray.ray.origin.setFromMatrixPosition(ctrl0.matrixWorld); ray.ray.direction.set(0,0,-1).applyMatrix4(tmpRot);
+  let targets;
+  if(xrModel==='air') targets=compMeshes.filter(m=>{ let n=m; while(n){ if(!n.visible) return false; n=n.parent; } return xray || m.userData.key==='prop'; });
+  else targets=parts[xrModel]?parts[xrModel].targets:[];
+  const hit=ray.intersectObjects(targets,false)[0];
+  if(hit){ showXRInfo(hit.object.userData.key); }
+  else if(xrModel==='air' && !xray){ xrMsg.textContent='Tip: zet "Doorzichtig" aan om de onderdelen te zien.'; }
+});
+async function startXR(){
+  try{
+    const s=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['dom-overlay','local-floor'],domOverlay:{root:xrUI}});
+    xrSession=s; renderer.xr.enabled=true; renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(s);
+    xrUI.classList.add('on'); scene.background=null; ground.visible=false; info.style.display='none';
+    if(!airPivot) airPivot=pivotOf(airGroup.children[0]);
+    placed=false; anchor.visible=false; setXRModel(xrModel);
+    xrMsg.textContent='Richt op de vloer of tafel en tik om te plaatsen.';
+    const vs=await s.requestReferenceSpace('viewer'); hitSource=await s.requestHitTestSource({space:vs});
+    s.addEventListener('end',()=>{
+      xrSession=null; hitSource=null; xrUI.classList.remove('on'); reticle.visible=false;
+      scene.background=new THREE.Color(0xeef1f5); ground.visible=true;
+      anchor.clear(); scene.add(airGroup); airGroup.position.set(0,0,0); anchor.scale.setScalar(1); anchor.position.set(0,0,0); anchor.rotation.set(0,0,0);
+      renderer.xr.enabled=false; setCam('all',false);
+    });
+  }catch(err){ alertBox('AR kon niet starten op dit apparaat.'); }
+}
+function alertBox(t){ const tip=document.getElementById('hint'); if(tip){ tip.style.display='block'; tip.textContent=t; } }
+if(navigator.xr && navigator.xr.isSessionSupported){
+  navigator.xr.isSessionSupported('immersive-ar').then(ok=>{ if(ok){ bXR.hidden=false; } }).catch(()=>{});
+}
+bXR.onclick=startXR;
+function xrFrame(frame){
+  if(!frame || !hitSource || placed) return;
+  const res=frame.getHitTestResults(hitSource);
+  if(res.length){ const pose=res[0].getPose(renderer.xr.getReferenceSpace()); reticle.visible=true; reticle.matrix.fromArray(pose.transform.matrix); xrMsg.textContent='Tik om het model te plaatsen.'; }
+  else reticle.visible=false;
+}
+function updateParts(dt){
+  for(const k in parts){ const p=parts[k]; if(!p.action) continue;
+    if(Math.abs(p.tcur-p.ttarget)>0.001){ const sp=2.2*dt; p.tcur+= Math.sign(p.ttarget-p.tcur)*Math.min(sp,Math.abs(p.ttarget-p.tcur)); p.action.time=p.tcur; p.mixer.update(0); }
+  }
+}
+
 // loop
 const clock=new THREE.Clock(); let t=0, w=0;
-renderer.setAnimationLoop(()=>{
+renderer.setAnimationLoop((time,frame)=>{
   const dt=Math.min(clock.getDelta(),0.05); t+=dt;
+  if(renderer.xr.isPresenting){ xrFrame(frame); updateParts(dt); }
   if(camAnim){ const k=Math.min((performance.now()-camAnim.s)/900,1), e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
     camera.position.lerpVectors(camAnim.p0,camAnim.p,e); controls.target.lerpVectors(camAnim.t0,camAnim.t,e); if(k>=1) camAnim=null; }
   const target=propOn?40:0; w+= (target-w)*Math.min(dt*1.5,1);
   if(prop) prop.rotation.x -= w*dt;
   updateFlows(t);
-  controls.update(); renderer.render(scene,camera);
+  if(!renderer.xr.isPresenting) controls.update();
+  renderer.render(scene,camera);
 });
 </script>
 </body>
