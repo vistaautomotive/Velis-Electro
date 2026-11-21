@@ -16,7 +16,7 @@ Plaats en vorm van de aandrijfcomponenten zijn schematisch en niet op ware maat.
   Sven Seipp (D-SVEN) en Carsten Vogel (TeXnicer). Gepubliceerd onder de GNU General Public License
   versie 2 of later. Het FlightGear-model is uitgebracht zonder officiële goedkeuring van Pipistrel.
 - **Aanpassingen (Vista College):** omgezet naar glTF (`velis.glb`), schematische aandrijfcomponenten
-  toegevoegd en een interactieve webpagina (`index.html`) gemaakt. Ook deze aanpassingen vallen onder de
+  toegevoegd, de belettering "VELIS"/"ELECTRO" op romp en vleugels vervangen door het VISTA-logo en een interactieve webpagina (`index.html`) gemaakt. Ook deze aanpassingen vallen onder de
   GNU GPL versie 2 of later.
 
 Zie `COPYING` voor de volledige licentietekst.
