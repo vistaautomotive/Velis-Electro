@@ -8,6 +8,7 @@ Plaats en vorm van de aandrijfcomponenten zijn schematisch en niet op ware maat.
 
 - `index.html` – interactieve 3D-versie (ook geschikt voor Electude en telefoon)
 - `ar.html` – AR-versie (iPhone/iPad, Android, Apple Vision Pro): buitenkant, aandrijflijn, exploded view, opengewerkte motor E-811 en accu. Direct linken kan met `ar.html#motor`, `#accu`, `#expl`, `#xray`.
+- `visionpro.html` – directe links naar de USDZ-modellen voor Apple Vision Pro (ook iPhone/iPad).
 - Op Android (Chrome met ARCore) heeft `index.html` ook een interactieve AR-modus (knop *AR starten*): plaatsen, schalen en op onderdelen tikken voor uitleg.
 
 ## Herkomst en licentie

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Velis Electro – Apple Vision Pro</title>
+<style>
+  :root{--fg:#1f2937;--muted:#6b7280;--accent:#0b5cad}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg);background:#eef1f5;padding:24px 20px 40px}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  p.lead{margin:0 0 20px;color:var(--muted);font-size:1rem;max-width:760px;line-height:1.45}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;max-width:1200px}
+  a.card{display:block;background:#fff;border:1px solid #d6dbe2;border-radius:16px;overflow:hidden;text-decoration:none;color:var(--fg);transition:transform .15s}
+  a.card:hover,a.card:focus-visible{transform:scale(1.02);outline:3px solid #93c5fd;outline-offset:2px}
+  a.card img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#dfe4ea}
+  .txt{padding:14px 16px 16px}
+  .txt b{display:block;font-size:1.15rem;margin-bottom:4px}
+  .txt span{font-size:.92rem;color:var(--muted);line-height:1.35}
+  .txt .open{color:#fff;display:inline-block;margin-top:10px;background:var(--accent);color:#fff;border-radius:999px;padding:8px 16px;font-size:.95rem}
+  .tips{max-width:760px;margin-top:26px;font-size:.92rem;line-height:1.5;color:var(--fg)}
+  .tips li{margin-bottom:4px}
+  .foot{margin-top:18px;font-size:.8rem;color:var(--muted)}
+  .foot a{color:var(--muted)}
+</style>
+</head>
+<body>
+  <h1>Pipistrel Velis Electro – Apple Vision Pro</h1>
+  <p class="lead">Tik op een model. Het opent in Quick Look; pak het vast en zet het in de ruimte. Werkt ook op iPhone en iPad.</p>
+
+  <div class="grid">
+    <a class="card" rel="ar" href="velis_ar.usdz"><img src="vp_ext.jpg" alt="Velis Electro buitenkant">
+      <div class="txt"><b>Buitenkant</b><span>Het complete toestel; de propeller draait. Ware grootte: 10,7 m spanwijdte.</span><br><span class="open">Openen in 3D</span></div></a>
+    <a class="card" rel="ar" href="velis_ar_xray.usdz"><img src="vp_xray.jpg" alt="Velis Electro met doorzichtige romp">
+      <div class="txt"><b>Aandrijflijn</b><span>Doorzichtige romp: accu's, motor + controller, koeling en HV-kabels.</span><br><span class="open">Openen in 3D</span></div></a>
+    <a class="card" rel="ar" href="velis_exploded.usdz"><img src="vp_expl.jpg" alt="Onderdelen uit elkaar">
+      <div class="txt"><b>Uit elkaar</b><span>Onderdelen schuiven uit het toestel, met labels. Lees ze vanaf de linkerkant.</span><br><span class="open">Openen in 3D</span></div></a>
+    <a class="card" rel="ar" href="motor_e811.usdz"><img src="vp_motor.jpg" alt="Motor E-811 opengewerkt">
+      <div class="txt"><b>Motor E-811</b><span>Axiaalfluxmotor op ware grootte (Ø 268 mm): rotors, stator, aansluitingen.</span><br><span class="open">Openen in 3D</span></div></a>
+    <a class="card" rel="ar" href="accu.usdz"><img src="vp_accu.jpg" alt="Accu opengewerkt">
+      <div class="txt"><b>Accu</b><span>11 kWh, 345 V: deksel, celmodules, BMS en koelplaat (schematisch).</span><br><span class="open">Openen in 3D</span></div></a>
+  </div>
+
+  <ul class="tips">
+    <li><b>Verplaatsen:</b> kijk naar het model, knijp en sleep.</li>
+    <li><b>Groter/kleiner:</b> knijp met twee handen en trek uit elkaar of naar elkaar toe. Maak het vliegtuig eerst kleiner.</li>
+    <li><b>Opent er een download in plaats van 3D?</b> Tik op het bestand in Downloads (Safari) of open het via de app Bestanden.</li>
+  </ul>
+  <p class="foot">Vliegtuigmodel: FlightGear Velis Electro (Bea Wolf, Sven Seipp, Carsten Vogel), GPLv2+. Aandrijfcomponenten en interne opbouw zijn schematisch. <a href="ar.html">AR-pagina</a> · <a href="./">Interactieve 3D-versie</a></p>
+</body>
+</html>
